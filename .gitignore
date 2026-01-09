@@ -14,6 +14,20 @@
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
+# Angular / Node
+client/node_modules/
+client/dist/
+client/.angular/
+client/.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+**/.env
+**/.env.*
+
 # Mono auto generated files
 mono_crash.*
 
