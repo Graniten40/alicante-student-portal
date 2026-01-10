@@ -23,6 +23,8 @@ builder.Services.AddIdentity<AppUser, IdentityRole>(opt =>
 {
     opt.Password.RequireNonAlphanumeric = false;
     opt.Password.RequireUppercase = false;
+    opt.Password.RequireDigit = false;
+    opt.Password.RequiredLength = 6; 
 })
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
@@ -59,6 +61,15 @@ builder.Services.AddCors(opt =>
 });
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<StudentPortal.Api.Data.AppDbContext>();
+    await StudentPortal.Api.Data.SeedData.SeedAsync(db);
+}
+
+
 
 app.UseSwagger();
 app.UseSwaggerUI();
