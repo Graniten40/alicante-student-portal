@@ -15,12 +15,17 @@ public class TokenService
 
     public string CreateToken(AppUser user)
     {
+        var lang = (user.PreferredLanguage?.ToLowerInvariant() == "zh") ? "zh" : "en";
+
         var claims = new List<Claim>
         {
+            // Bra att ha både sub + NameIdentifier
             new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(ClaimTypes.NameIdentifier, user.Id),
+
             new(JwtRegisteredClaimNames.Email, user.Email ?? ""),
             new("displayName", user.DisplayName ?? ""),
-            new("lang", user.PreferredLanguage ?? "en"),
+            new("lang", lang),
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opt.Key));

@@ -8,6 +8,8 @@ public class Entitlement
     public string Source { get; set; } = "Free"; // Free/Stripe
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? ValidUntil { get; set; }
-
-    public Product? Product { get; set; }
+    public DateTime GrantedAtUtc { get; set; } = DateTime.UtcNow;
+    
+    // navigation
+    public Product? Product { get; set; } = default!;
 }

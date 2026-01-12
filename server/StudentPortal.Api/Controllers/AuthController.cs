@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using StudentPortal.Api.Auth;
+using StudentPortal.Api.Data;
 using StudentPortal.Api.Dtos;
 using StudentPortal.Api.Services;
 
@@ -16,12 +18,18 @@ public class AuthController : ControllerBase
     private readonly UserManager<AppUser> _users;
     private readonly SignInManager<AppUser> _signIn;
     private readonly TokenService _tokens;
+    private readonly AppDbContext _db;
 
-    public AuthController(UserManager<AppUser> users, SignInManager<AppUser> signIn, TokenService tokens)
+    public AuthController(
+        UserManager<AppUser> users,
+        SignInManager<AppUser> signIn,
+        TokenService tokens,
+        AppDbContext db)
     {
         _users = users;
         _signIn = signIn;
         _tokens = tokens;
+        _db = db;
     }
 
     [HttpPost("register")]
@@ -29,8 +37,9 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<object>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<AuthResponseDto>> Register(RegisterDto dto)
     {
-        // Normalisera språk (bara "en" och "zh" om du vill hålla det strikt)
-        var lang = string.IsNullOrWhiteSpace(dto.PreferredLanguage) ? "en" : dto.PreferredLanguage.Trim().ToLowerInvariant();
+        var lang = string.IsNullOrWhiteSpace(dto.PreferredLanguage)
+            ? "en"
+            : dto.PreferredLanguage.Trim().ToLowerInvariant();
 
         var user = new AppUser
         {
@@ -43,9 +52,25 @@ public class AuthController : ControllerBase
         var result = await _users.CreateAsync(user, dto.Password);
         if (!result.Succeeded)
         {
-            // Returnera alltid JSON på samma form
             var errors = result.Errors.Select(e => new { code = e.Code, description = e.Description });
             return BadRequest(errors);
+        }
+
+        // ✅ Auto-grant Basic Arrival Pack
+        var basic = await _db.Products.FirstOrDefaultAsync(p => p.Slug == "basic-arrival");
+        if (basic != null)
+        {
+            var alreadyHas = await _db.Entitlements.AnyAsync(e => e.UserId == user.Id && e.ProductId == basic.Id);
+            if (!alreadyHas)
+            {
+                _db.Entitlements.Add(new StudentPortal.Api.Models.Entitlement
+                {
+                    UserId = user.Id,
+                    ProductId = basic.Id
+                });
+
+                await _db.SaveChangesAsync();
+            }
         }
 
         var token = _tokens.CreateToken(user);
