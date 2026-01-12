@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StudentPortal.Api.Auth;
-using StudentPortal.Api.Data;
 using StudentPortal.Api.Models;
 
 namespace StudentPortal.Api.Data;
@@ -14,10 +13,17 @@ public static class DevDataSeeder
 
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
-        // Se till att DB + migrations är på plats (om du kör migrations automatiskt)
-        // Annars kan du kommentera bort nästa rad.
         await db.Database.MigrateAsync();
+
+        // 0) Roles
+        var roleNames = new[] { "Admin", "Student" };
+        foreach (var r in roleNames)
+        {
+            if (!await roles.RoleExistsAsync(r))
+                await roles.CreateAsync(new IdentityRole(r));
+        }
 
         // 1) Product (paket)
         const string slug = "starter-pack";
@@ -66,12 +72,10 @@ public static class DevDataSeeder
         }
 
         // 3) Entitlement för en test-user
-        // Ändra email till ditt konto som du loggar in med i dev
         const string devEmail = "johan@test.se";
 
         var user = await users.Users.SingleOrDefaultAsync(u => u.Email == devEmail);
 
-        // Om du vill auto-skapa user om den saknas (valfritt)
         if (user is null)
         {
             user = new AppUser
@@ -84,8 +88,12 @@ public static class DevDataSeeder
 
             var created = await users.CreateAsync(user, "Password123!");
             if (!created.Succeeded)
-                return; // eller kasta exception/logga
+                return;
         }
+
+        // ✅ Make dev user Admin
+        if (!await users.IsInRoleAsync(user, "Admin"))
+            await users.AddToRoleAsync(user, "Admin");
 
         var alreadyEntitled = await db.Entitlements.AnyAsync(e =>
             e.UserId == user.Id && e.ProductId == product.Id);
@@ -97,7 +105,7 @@ public static class DevDataSeeder
                 UserId = user.Id,
                 ProductId = product.Id,
                 Source = "Free",
-                ValidUntil = null, // livstid
+                ValidUntil = null,
                 CreatedAt = DateTimeOffset.UtcNow
             });
 

@@ -90,7 +90,13 @@ builder.Services
             ValidIssuer = jwt.Issuer,
             ValidAudience = jwt.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
-            ClockSkew = TimeSpan.FromMinutes(1)
+            ClockSkew = TimeSpan.FromMinutes(1),
+
+            // ✅ Viktigt för [Authorize(Roles="Admin")]
+            RoleClaimType = System.Security.Claims.ClaimTypes.Role,
+
+            // ✅ Så NameIdentifier blir rätt överallt
+            NameClaimType = System.Security.Claims.ClaimTypes.NameIdentifier
         };
 
         // Gör att du alltid får 401 istället för redirect/login-sidor
@@ -121,6 +127,27 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     await DevDataSeeder.SeedAsync(app.Services);
+
+    // ✅ SEED: Admin-roll + gör dev@bu.dev till Admin (endast i Development)
+    using (var scope = app.Services.CreateScope())
+    {
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+
+        const string adminRole = "Admin";
+        const string adminEmail = "dev@bu.dev";
+
+        if (!await roleManager.RoleExistsAsync(adminRole))
+        {
+            await roleManager.CreateAsync(new IdentityRole(adminRole));
+        }
+
+        var adminUser = await userManager.FindByEmailAsync(adminEmail);
+        if (adminUser != null && !await userManager.IsInRoleAsync(adminUser, adminRole))
+        {
+            await userManager.AddToRoleAsync(adminUser, adminRole);
+        }
+    }
 
     app.UseSwagger();
     app.UseSwaggerUI(c =>

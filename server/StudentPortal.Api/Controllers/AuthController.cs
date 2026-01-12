@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using StudentPortal.Api.Auth;
 using StudentPortal.Api.Data;
 using StudentPortal.Api.Dtos;
 using StudentPortal.Api.Services;
+using System.Security.Claims;
+
 
 namespace StudentPortal.Api.Controllers;
 
@@ -73,7 +76,7 @@ public class AuthController : ControllerBase
             }
         }
 
-        var token = _tokens.CreateToken(user);
+        var token = await _tokens.CreateTokenAsync(user);
         return Ok(new AuthResponseDto(token, user.Email!, user.DisplayName, user.PreferredLanguage));
     }
 
@@ -90,7 +93,18 @@ public class AuthController : ControllerBase
         if (!result.Succeeded)
             return Unauthorized(new { message = "Invalid credentials" });
 
-        var token = _tokens.CreateToken(user);
+        var token = await _tokens.CreateTokenAsync(user);
         return Ok(new AuthResponseDto(token, user.Email!, user.DisplayName, user.PreferredLanguage));
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public ActionResult<object> Me()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var email = User.FindFirstValue(ClaimTypes.Email);
+        var roles = User.FindAll(ClaimTypes.Role).Select(r => r.Value).ToList();
+
+        return Ok(new { userId, email, roles });
     }
 }
