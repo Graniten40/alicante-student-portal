@@ -8,9 +8,10 @@ settle in Spain by providing structured guides, checklists, and services.
 ## 🔧 Tech Stack
 - Backend: ASP.NET Core Web API
 - Frontend: Angular (planned)
-- Database: SQL Server (planned)
-- Auth: JWT (planned)
+- Database: SQL Server + Entity Framework Core
+- Auth: ASP.NET Core Identity + JWT
 - Hosting: Docker / Azure (planned)
+- API Docs: Swagger / OpenAPI
 
 ---
 
