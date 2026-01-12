@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using StudentPortal.Api.Auth;
@@ -11,17 +12,35 @@ namespace StudentPortal.Api.Services;
 public class TokenService
 {
     private readonly JwtOptions _opt;
-    public TokenService(IOptions<JwtOptions> opt) => _opt = opt.Value;
+    private readonly UserManager<AppUser> _users;
 
-    public string CreateToken(AppUser user)
+    public TokenService(IOptions<JwtOptions> opt, UserManager<AppUser> users)
     {
+        _opt = opt.Value;
+        _users = users;
+    }
+
+    public async Task<string> CreateTokenAsync(AppUser user)
+    {
+        var lang = (user.PreferredLanguage?.ToLowerInvariant() == "zh") ? "zh" : "en";
+
         var claims = new List<Claim>
         {
+            // Bra att ha både sub + NameIdentifier
             new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(ClaimTypes.NameIdentifier, user.Id),
+
             new(JwtRegisteredClaimNames.Email, user.Email ?? ""),
             new("displayName", user.DisplayName ?? ""),
-            new("lang", user.PreferredLanguage ?? "en"),
+            new("lang", lang),
         };
+
+        // ✅ Lägg till roller i JWT (det som krävs för [Authorize(Roles="Admin")])
+        var roles = await _users.GetRolesAsync(user);
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opt.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
