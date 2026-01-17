@@ -20,13 +20,13 @@ public class AuthController : ControllerBase
 {
     private readonly UserManager<AppUser> _users;
     private readonly SignInManager<AppUser> _signIn;
-    private readonly TokenService _tokens;
+    private readonly JwtTokenService _tokens;
     private readonly AppDbContext _db;
 
     public AuthController(
         UserManager<AppUser> users,
         SignInManager<AppUser> signIn,
-        TokenService tokens,
+        JwtTokenService tokens,
         AppDbContext db)
     {
         _users = users;

@@ -8,8 +8,19 @@ using StudentPortal.Api.Data;
 using StudentPortal.Api.Options;
 using StudentPortal.Api.Services;
 using System.Text;
+using Stripe;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var stripeSecretKey = builder.Configuration["Stripe:SecretKey"];
+
+if (string.IsNullOrWhiteSpace(stripeSecretKey))
+{
+    throw new Exception("Stripe secret key is missing");
+}
+
+StripeConfiguration.ApiKey = stripeSecretKey;
+
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -55,7 +66,7 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
 
 // Services
 builder.Services.AddScoped<IPortalService, PortalService>();
-builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<JwtTokenService>();
 
 // Identity
 builder.Services.AddIdentity<AppUser, IdentityRole>(opt =>

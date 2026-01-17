@@ -1,9 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>89f4d7f1-1dc2-4cce-9d33-5c757bee0ee7</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +21,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.11" />
 
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.15.0" />
+
+    <PackageReference Include="Stripe.net" Version="50.2.0" />
 
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.15.0" />

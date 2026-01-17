@@ -9,12 +9,12 @@ using System.Text;
 
 namespace StudentPortal.Api.Services;
 
-public class TokenService
+public class JwtTokenService
 {
     private readonly JwtOptions _opt;
     private readonly UserManager<AppUser> _users;
 
-    public TokenService(IOptions<JwtOptions> opt, UserManager<AppUser> users)
+    public JwtTokenService(IOptions<JwtOptions> opt, UserManager<AppUser> users)
     {
         _opt = opt.Value;
         _users = users;
