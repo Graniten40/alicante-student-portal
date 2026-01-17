@@ -16,6 +16,10 @@ public sealed class PortalController : ControllerBase
 
     public PortalController(IPortalService portal) => _portal = portal;
 
+    // -------------------------
+    // Legacy (utan market)
+    // -------------------------
+
     [HttpGet("my-packages")]
     [ProducesResponseType(typeof(IReadOnlyList<MyPackageDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -24,16 +28,18 @@ public sealed class PortalController : ControllerBase
         if (!TryGetUser(out var userId, out var lang))
             return Unauthorized();
 
-        var result = await _portal.GetMyPackagesAsync(userId, lang, ct);
+        var now = DateTimeOffset.UtcNow;
+
+        var result = await _portal.GetMyPackagesAsync(userId, lang, now, ct);
         return Ok(result);
     }
 
     [HttpGet("p/{slug}")]
-    [ProducesResponseType(typeof(PortalPackageContentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PortalPackageDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<PortalPackageContentDto>> GetPackage(string slug, CancellationToken ct)
+    public async Task<ActionResult<PortalPackageDto>> GetPackage(string slug, CancellationToken ct)
     {
         if (!TryGetUser(out var userId, out var lang))
             return Unauthorized();
@@ -52,15 +58,60 @@ public sealed class PortalController : ControllerBase
         };
     }
 
-    // Debug (anonymous)
+    // -------------------------
+    // Market-aware (ny)
+    // -------------------------
+
+    [HttpGet("{code}/my-packages")]
+    [ProducesResponseType(typeof(IReadOnlyList<MyPackageDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<MyPackageDto>>> MyPackagesByMarket(string code, CancellationToken ct)
+    {
+        if (!TryGetUser(out var userId, out var lang))
+            return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(code))
+            return NotFound();
+
+        var now = DateTimeOffset.UtcNow;
+
+        var result = await _portal.GetMyPackagesByMarketAsync(userId, code, lang, now, ct);
+        return Ok(result);
+    }
+
+    [HttpGet("{code}/p/{slug}")]
+    [ProducesResponseType(typeof(PortalPackageDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PortalPackageDto>> GetPackageByMarket(string code, string slug, CancellationToken ct)
+    {
+        if (!TryGetUser(out var userId, out var lang))
+            return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(slug))
+            return NotFound();
+
+        var result = await _portal.GetPackageIfEntitledByMarketAsync(userId, code, slug, lang, ct);
+
+        return result.Status switch
+        {
+            PortalAccessStatus.NotFound => NotFound(),
+            PortalAccessStatus.Forbidden => Forbid(),
+            PortalAccessStatus.Ok => Ok(result.Package),
+            _ => StatusCode(StatusCodes.Status500InternalServerError)
+        };
+    }
+
+    // -------------------------
+    // Debug
+    // -------------------------
+
     [HttpGet("ping")]
     [AllowAnonymous]
     public IActionResult Ping() => Ok("portal pong v3");
 
-    // Debug (requires auth)
-    // DEBUG ONLY:
-    // Endpoint för att verifiera JWT / claims under utveckling.
-    // ⚠️ Ska tas bort eller spärras innan produktion.
     [HttpGet("whoami")]
     public IActionResult WhoAmI()
     {

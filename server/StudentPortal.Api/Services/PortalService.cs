@@ -13,30 +13,41 @@ public sealed class PortalService : IPortalService
         _db = db;
     }
 
-    public async Task<List<MyPackageDto>> GetMyPackagesAsync(string userId, string lang, CancellationToken ct)
+    public async Task<List<MyPackageDto>> GetMyPackagesAsync(
+        string userId,
+        string lang,
+        DateTimeOffset now,
+        CancellationToken ct)
     {
-        var now = DateTimeOffset.UtcNow;
-        lang = (lang == "zh") ? "zh" : "en";
+        var isZh = string.Equals(lang?.Trim(), "zh", StringComparison.OrdinalIgnoreCase);
 
-        var items = await _db.Entitlements
+        var rows = await _db.Entitlements
             .AsNoTracking()
             .Where(e => e.UserId == userId)
             .Join(_db.Products.AsNoTracking(),
                 e => e.ProductId,
                 p => p.Id,
-                (e, p) => new { e, p })
-            .Select(x => new MyPackageDto(
-                x.p.Id,
-                x.p.Slug,
-                lang == "zh" ? x.p.TitleZh : x.p.TitleEn,
-                x.e.ValidUntil,
-                x.e.ValidUntil == null || x.e.ValidUntil > now
-            ))
+                (e, p) => new
+                {
+                    p.Id,
+                    p.Slug,
+                    Title = isZh ? p.TitleZh : p.TitleEn,
+                    e.ValidUntil,
+                    IsActive = (e.ValidUntil == null) || (e.ValidUntil > now)
+                })
             .OrderByDescending(x => x.IsActive)
             .ThenBy(x => x.Title)
             .ToListAsync(ct);
 
-        return items;
+        return rows
+            .Select(x => new MyPackageDto(
+                x.Id,
+                x.Slug,
+                x.Title,
+                x.ValidUntil,
+                x.IsActive
+            ))
+            .ToList();
     }
 
     public async Task<PortalAccessResult> GetPackageIfEntitledAsync(
@@ -46,7 +57,7 @@ public sealed class PortalService : IPortalService
         CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
-        lang = (lang == "zh") ? "zh" : "en";
+        var isZh = string.Equals(lang?.Trim(), "zh", StringComparison.OrdinalIgnoreCase);
 
         var pkg = await _db.Products
             .AsNoTracking()
@@ -55,8 +66,8 @@ public sealed class PortalService : IPortalService
             {
                 p.Id,
                 p.Slug,
-                Title = lang == "zh" ? p.TitleZh : p.TitleEn,
-                Description = lang == "zh" ? p.DescriptionZh : p.DescriptionEn
+                Title = isZh ? p.TitleZh : p.TitleEn,
+                Description = isZh ? p.DescriptionZh : p.DescriptionEn
             })
             .SingleOrDefaultAsync(ct);
 
@@ -74,7 +85,7 @@ public sealed class PortalService : IPortalService
         if (!entitled)
             return new PortalAccessResult(PortalAccessStatus.Forbidden, null);
 
-        // OBS: singular "content" (senaste publicerade)
+        // Senaste publicerade content
         var content = await _db.PackContents
             .AsNoTracking()
             .Where(pc => pc.ProductId == pkg.Id)
@@ -86,7 +97,6 @@ public sealed class PortalService : IPortalService
             ))
             .FirstOrDefaultAsync(ct);
 
-        // ✅ RÄTT: skapa PortalPackageDto (inte PortalPackageContentDto)
         var dto = new PortalPackageDto(
             pkg.Id,
             pkg.Slug,
@@ -97,4 +107,123 @@ public sealed class PortalService : IPortalService
 
         return new PortalAccessResult(PortalAccessStatus.Ok, dto);
     }
+
+    public async Task<List<MyPackageDto>> GetMyPackagesByMarketAsync(
+        string userId,
+        string marketCode,
+        string lang,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var isZh = string.Equals(lang?.Trim(), "zh", StringComparison.OrdinalIgnoreCase);
+
+        var marketId = await _db.Markets
+            .AsNoTracking()
+            .Where(m => m.Code == marketCode && m.IsActive)
+            .Select(m => (int?)m.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (marketId is null)
+            return new List<MyPackageDto>();
+
+        var rows = await _db.Entitlements
+            .AsNoTracking()
+            .Where(e => e.UserId == userId)
+            .Join(_db.Products.AsNoTracking(),
+                e => e.ProductId,
+                p => p.Id,
+                (e, p) => new
+                {
+                    p.Id,
+                    p.Slug,
+                    p.MarketId,
+                    Title = isZh ? p.TitleZh : p.TitleEn,
+                    e.ValidUntil,
+                    IsActive = (e.ValidUntil == null) || (e.ValidUntil > now)
+                })
+            .Where(x => x.MarketId == marketId.Value)
+            .OrderByDescending(x => x.IsActive)
+            .ThenBy(x => x.Title)
+            .ToListAsync(ct);
+
+        return rows
+            .Select(x => new MyPackageDto(
+                x.Id,
+                x.Slug,
+                x.Title,
+                x.ValidUntil,
+                x.IsActive
+            ))
+            .ToList();
+    }
+
+
+    public async Task<PortalAccessResult> GetPackageIfEntitledByMarketAsync(
+        string userId,
+        string marketCode,
+        string packageSlug,
+        string lang,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var isZh = string.Equals(lang?.Trim(), "zh", StringComparison.OrdinalIgnoreCase);
+
+        // Hämta marketId först (stabilare än att gå via navigation p.Market.Code)
+        var marketId = await _db.Markets
+            .AsNoTracking()
+            .Where(m => m.Code == marketCode && m.IsActive)
+            .Select(m => (int?)m.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (marketId is null)
+            return new PortalAccessResult(PortalAccessStatus.NotFound, null);
+
+        var pkg = await _db.Products
+            .AsNoTracking()
+            .Where(p => p.MarketId == marketId.Value && p.Slug == packageSlug)
+            .Select(p => new
+            {
+                p.Id,
+                p.Slug,
+                Title = isZh ? p.TitleZh : p.TitleEn,
+                Description = isZh ? p.DescriptionZh : p.DescriptionEn
+            })
+            .SingleOrDefaultAsync(ct);
+
+        if (pkg is null)
+            return new PortalAccessResult(PortalAccessStatus.NotFound, null);
+
+        var entitled = await _db.Entitlements
+            .AsNoTracking()
+            .AnyAsync(e =>
+                e.UserId == userId &&
+                e.ProductId == pkg.Id &&
+                (e.ValidUntil == null || e.ValidUntil > now),
+                ct);
+
+        if (!entitled)
+            return new PortalAccessResult(PortalAccessStatus.Forbidden, null);
+
+        var content = await _db.PackContents
+            .AsNoTracking()
+            .Where(pc => pc.ProductId == pkg.Id)
+            .OrderByDescending(pc => pc.PublishedAt)
+            .Select(pc => new PortalPackageContentDto(
+                pc.Version,
+                pc.JsonContent,
+                pc.PublishedAt
+            ))
+            .FirstOrDefaultAsync(ct);
+
+        var dto = new PortalPackageDto(
+            pkg.Id,
+            pkg.Slug,
+            pkg.Title,
+            pkg.Description,
+            content
+        );
+
+        return new PortalAccessResult(PortalAccessStatus.Ok, dto);
+    }
+
 }

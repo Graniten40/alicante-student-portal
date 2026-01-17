@@ -1,3 +1,5 @@
+using StudentPortal.Api.Domain;
+
 namespace StudentPortal.Api.Models;
 
 public class Product
@@ -11,4 +13,7 @@ public class Product
     public int PriceCents { get; set; }
     public bool IsFree { get; set; }
     public bool IsActive { get; set; } = true;
+    public int MarketId { get; set; }
+    public Market Market { get; set; } = default!;
+
 }

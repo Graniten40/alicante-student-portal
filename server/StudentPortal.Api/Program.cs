@@ -87,6 +87,7 @@ builder.Services
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
+
             ValidIssuer = jwt.Issuer,
             ValidAudience = jwt.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
@@ -126,9 +127,14 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    await DevDataSeeder.SeedAsync(app.Services);
+    // ✅ Seed: Markets + Products + PackContent (Chiang Mai)
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await SeedData.SeedAsync(db);
+    }
 
-    // ✅ SEED: Admin-roll + gör dev@bu.dev till Admin (endast i Development)
+    // ✅ Seed: Admin-roll + gör dev@bu.dev till Admin
     using (var scope = app.Services.CreateScope())
     {
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
@@ -136,17 +142,14 @@ if (app.Environment.IsDevelopment())
 
         const string adminRole = "Admin";
         const string adminEmail = "dev@bu.dev";
+        const string adminPassword = "Stron123";
 
         if (!await roleManager.RoleExistsAsync(adminRole))
-        {
             await roleManager.CreateAsync(new IdentityRole(adminRole));
-        }
 
         var adminUser = await userManager.FindByEmailAsync(adminEmail);
         if (adminUser != null && !await userManager.IsInRoleAsync(adminUser, adminRole))
-        {
             await userManager.AddToRoleAsync(adminUser, adminRole);
-        }
     }
 
     app.UseSwagger();
@@ -157,6 +160,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
 app.UseCors("dev");
 
 app.UseAuthentication();

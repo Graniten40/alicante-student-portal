@@ -11,6 +11,9 @@ public class AppDbContext : IdentityDbContext<AppUser>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) {}
 
+    // Markets
+    public DbSet<Market> Markets => Set<Market>();
+
     // New modules
     public DbSet<StudentHousing> StudentHousing => Set<StudentHousing>();
     public DbSet<StudentContactLog> StudentContactLogs => Set<StudentContactLog>();
@@ -72,12 +75,29 @@ public class AppDbContext : IdentityDbContext<AppUser>
             .OnDelete(DeleteBehavior.Restrict);
 
         // ---------------------------
-        // Existing models
+        // Markets
         // ---------------------------
-        b.Entity<Product>()
-            .HasIndex(x => x.Slug)
+        b.Entity<Market>()
+            .HasIndex(x => x.Code)
             .IsUnique();
 
+        // ---------------------------
+        // Products
+        // ---------------------------
+        b.Entity<Product>()
+            .HasOne(p => p.Market)
+            .WithMany()
+            .HasForeignKey(p => p.MarketId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Unik slug per market (inte globalt)
+        b.Entity<Product>()
+            .HasIndex(p => new { p.MarketId, p.Slug })
+            .IsUnique();
+
+        // ---------------------------
+        // Existing models
+        // ---------------------------
         b.Entity<Entitlement>()
             .HasOne(x => x.Product)
             .WithMany()
