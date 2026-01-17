@@ -1,5 +1,5 @@
 .checkout {
-  max-width: 520px;
+  max-width: 520px;   // justera: 420–600 är vanligt
   margin: 40px auto;
   padding: 24px;
   border: 1px solid #e5e7eb;
@@ -7,11 +7,11 @@
   background: #fff;
 }
 
-.checkout #payment-element {
-  width: 100%;
-}
-
-.checkout .btn {
+.btn {
   margin-top: 16px;
   padding: 10px 14px;
+}
+
+.status {
+  margin-top: 12px;
 }
